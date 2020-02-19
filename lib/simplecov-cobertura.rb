@@ -66,6 +66,13 @@ module SimpleCov
                 set_line_attributes(line, file_line)
               end
             end
+
+            file.branches.each do |file_branch|
+              if file_branch.covered? || file_branch.missed?
+                branches.add_element(branch = REXML::Element.new('branch'))
+                set_branch_attributes(branch, file_branch)
+              end
+            end
           end
         end
 
@@ -74,12 +81,13 @@ module SimpleCov
 
       def set_coverage_attributes(coverage, result)
         coverage.attributes['line-rate'] = (result.covered_percent/100).round(2).to_s
-        coverage.attributes['branch-rate'] = '0'
         coverage.attributes['lines-covered'] = result.covered_lines.to_s
         coverage.attributes['lines-valid'] = (result.covered_lines + result.missed_lines).to_s
-        coverage.attributes['branches-covered'] = '0'
-        coverage.attributes['branches-valid'] = '0'
-        coverage.attributes['branch-rate'] = '0'
+        # coverage.attributes['branch-rate'] = ((result&.branch_covered_percent || 0)/100).round(2).to_s
+        coverage.attributes['branch-rate'] = ((result&.covered_branches || 0) / (result&.total_branches || 1)).to_s
+        coverage.attributes['branches-covered'] = (result&.covered_branches || 0).to_s
+        coverage.attributes['branches-valid'] = ((result&.covered_branches || 0) + (result&.missed_branches || 0)).to_s
+        # coverage.attributes['branches-valid'] = (result&.total_branches || 0).to_s
         coverage.attributes['complexity'] = '0'
         coverage.attributes['version'] = '0'
         coverage.attributes['timestamp'] = Time.now.to_i.to_s
@@ -88,7 +96,7 @@ module SimpleCov
       def set_package_attributes(package, name, result)
         package.attributes['name'] = name
         package.attributes['line-rate'] = (result.covered_percent/100).round(2).to_s
-        package.attributes['branch-rate'] = '0'
+        package.attributes['branch-rate'] = ((result&.branch_covered_percent || 0)/100).round(2).to_s
         package.attributes['complexity'] = '0'
       end
 
@@ -98,7 +106,7 @@ module SimpleCov
         class_.attributes['name'] = File.basename(filename, '.*')
         class_.attributes['filename'] = path
         class_.attributes['line-rate'] = (file.covered_percent/100).round(2).to_s
-        class_.attributes['branch-rate'] = '0'
+        class_.attributes['branch-rate'] = ((file&.branches_coverage_percent || 0)/100).round(2).to_s
         class_.attributes['complexity'] = '0'
       end
 
@@ -106,6 +114,22 @@ module SimpleCov
         line.attributes['number'] = file_line.line_number.to_s
         line.attributes['branch'] = 'false'
         line.attributes['hits'] = file_line.coverage.to_s
+      end
+
+      # @see https://github.com/cobertura/cobertura/wiki/Line-Coverage-Explained
+      # @see https://github.com/leobalter/testing-examples/blob/master/solutions/3/report/cobertura-coverage.xml
+      # @see https://gist.githubusercontent.com/apetro/fcfffb8c4cdab2c1061d/raw/e71c66321b12571b11d1ca37b531432c0010ee0f/coverage.xml
+      def set_branch_attributes(branch, file_branch)
+        branch.attributes['number'] = file_branch.start_line.to_s
+        branch.attributes['branch'] = 'true'
+        branch.attributes['hits'] = file_branch.coverage.to_s
+        # branch.attributes['condition-coverage'] = "50% (1/2)"
+
+        # branch.attributes['start_line'] = file_branch.start_line.to_s
+        # branch.attributes['end_line'] = file_branch.end_line.to_s
+        # branch.attributes['coverage'] = file_branch.coverage.to_s
+        # branch.attributes['inline'] = file_branch.inline.to_s
+        # branch.attributes['type'] = file_branch.type.to_s
       end
 
       def set_xml_head(lines=[])
